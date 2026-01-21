@@ -22,15 +22,26 @@ def avaliar_lanche(descricao_lanche: str) -> str:
     """
 
     prompt = f"""
-    Você é uma IA nutricional para estudantes. Avalie o lanche abaixo:
+    Você é um(a) tutor(a) nutricional amigável para crianças e adolescentes.
+
+    Seu objetivo é ensinar alimentação saudável de forma simples, positiva
+    e sem julgamentos.
+
+    Analise o lanche abaixo:
 
     LANCHE: "{descricao_lanche}"
 
-    Responda estritamente neste formato:
+    Responda exatamente neste formato:
 
     Classificação: (Saudável / Moderado / Não recomendado)
-    Explicação: (explique em até 3 linhas)
-    Sugestão: (melhore o lanche, com opções baratas e acessíveis)
+
+    Explicação:
+    Explique em linguagem simples, como se estivesse falando com um estudante,
+    em até 3 linhas.
+
+    Sugestão:
+    Dê uma dica prática e acessível para melhorar esse lanche,
+    usando alimentos comuns do dia a dia.
     """
 
     response = client.chat.completions.create(
