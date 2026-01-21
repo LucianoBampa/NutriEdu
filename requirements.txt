@@ -7,4 +7,4 @@ numpy
 openai>=2.0
 pillow
 matplotlib
-python-dotenvgit
+python-dotenv
