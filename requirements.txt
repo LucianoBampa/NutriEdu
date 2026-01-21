@@ -1,0 +1,9 @@
+streamlit>=1.20
+streamlit-webrtc>=0.45
+opencv-contrib-python
+mediapipe==0.10.5
+numpy
+av
+openai>=2.0
+pillow
+matplotlib
