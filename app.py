@@ -5,7 +5,15 @@ import streamlit as st
 from dotenv import load_dotenv
 
 from nutri_ai import avaliar_lanche
-from emocao import executar_emocoes
+# from emocao import executar_emocoes # Desativado para implantação sem webcam
+
+EXECUTAR_EMOCAO = False
+
+try:
+    from emocao import executar_emocoes
+    EXECUTAR_EMOCAO = True
+except Exception:
+    EXECUTAR_EMOCAO = False
 
 
 # =========================
@@ -64,10 +72,19 @@ st.subheader("Educação nutricional inteligente para estudantes")
 # =========================
 st.markdown("## 😊 Análise Emocional")
 
+# if st.button("📷 Detectar emoção"):
+#     with st.spinner("Analisando emoção..."):
+#         emocao = executar_emocoes()
+#         st.session_state.emocao_detectada = emocao
+# desativado para implantação sem webcam
+
 if st.button("📷 Detectar emoção"):
-    with st.spinner("Analisando emoção..."):
-        emocao = executar_emocoes()
-        st.session_state.emocao_detectada = emocao
+    if not EXECUTAR_EMOCAO:
+        st.warning("⚠️ Análise emocional disponível apenas em execução local.")
+    else:
+        with st.spinner("Analisando emoção..."):
+            emocao = executar_emocoes()
+            st.session_state.emocao_detectada = emocao
 
 if st.session_state.emocao_detectada:
     emocao = st.session_state.emocao_detectada
