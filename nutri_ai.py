@@ -1,15 +1,18 @@
-from openai import OpenAI
 import os
-from dotenv import load_dotenv
+import streamlit as st
+from openai import OpenAI
 
-# Carregar chave da API
-load_dotenv()
+# Tenta pegar do Streamlit Cloud
+api_key = st.secrets.get("OPENAI_API_KEY", None)
 
-if not os.getenv("OPENAI_API_KEY"):
-    raise ValueError(
-        "❌ Erro: A chave OPENAI_API_KEY não está definida no arquivo .env")
+# Fallback local (.env)
+if api_key is None:
+    api_key = os.getenv("OPENAI_API_KEY")
 
-client = OpenAI()
+if not api_key:
+    raise ValueError("❌ OPENAI_API_KEY não configurada")
+
+client = OpenAI(api_key=api_key)
 
 
 def avaliar_lanche(descricao_lanche: str) -> str:
