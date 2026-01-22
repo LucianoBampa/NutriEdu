@@ -1,6 +1,7 @@
 streamlit==1.50.0
 # streamlit-webrtc==0.47.9 # apenas para uso local
 # opencv-contrib-python # apenas para uso local
+opencv-python-headless
 mediapipe==0.10.31
 numpy
 # av # streamlit-webrtc já gerencia isso internamente
@@ -8,3 +9,4 @@ openai>=2.0
 pillow
 matplotlib
 python-dotenv
+pandas
