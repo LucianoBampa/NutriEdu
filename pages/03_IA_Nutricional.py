@@ -39,8 +39,20 @@ def obter_cliente_openai():
     return OpenAI(api_key=api_key)
 
 
+import streamlit as st
+import openai
+
+# Exemplo de cache simples para não gastar créditos desnecessariamente
+cache_alimentos = {}
+
+
 def analisar_alimento(alimento, idade):
-    """Analisa um alimento usando IA"""
+    """Analisa um alimento usando IA com tratamento de quota."""
+    # Primeiro, checa se já analisou antes
+    key = f"{alimento}_{idade}"
+    if key in cache_alimentos:
+        return cache_alimentos[key]
+
     client = obter_cliente_openai()
 
     # Adaptar prompt de acordo com a idade
@@ -79,7 +91,7 @@ def analisar_alimento(alimento, idade):
                 {
                     "role": "system",
                     "content": "Você é um nutricionista educacional "
-                    "especializado em crianças e adolescentes.",
+                               "especializado em crianças e adolescentes.",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -87,10 +99,15 @@ def analisar_alimento(alimento, idade):
             max_tokens=500,
         )
 
-        return response.choices[0].message.content
+        resultado = response.choices[0].message.content
+        cache_alimentos[key] = resultado  # salva no cache
+        return resultado
 
+    except openai.error.RateLimitError:
+        st.warning("Quota da API da OpenAI esgotada. Tente novamente mais tarde.")
+        return "Não foi possível analisar o alimento agora. 😔"
     except Exception as e:
-        st.error(f"Erro ao analisar alimento: {e}")
+        st.error(f"Erro inesperado ao analisar alimento: {e}")
         return None
 
 
