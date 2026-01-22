@@ -1,88 +1,224 @@
-import cv2
 import streamlit as st
-from streamlit_webrtc import webrtc_streamer, WebRtcMode, VideoProcessorBase
-import av
+import cv2
+import numpy as np
+from PIL import Image
+import time
 
-
-# media pipe detect
+# Imports do MediaPipe corrigidos
+# Agora assim:
 try:
     import mediapipe as mp
-    MEDIAPIPE_DISPONIVEL = True
-except Exception:
-    MEDIAPIPE_DISPONIVEL = False
+    mp_face_mesh = mp.solutions.face_mesh  # type: ignore
+    mp_drawing = mp.solutions.drawing_utils  # type: ignore
+    mp_drawing_styles = mp.solutions.drawing_styles  # type: ignore
+except ImportError:
+    st.error("MediaPipe não está instalado. Execute: pip install mediapipe")
+    st.stop()
+
+# Configuração da página
+st.set_page_config(page_title="IA Emocional - NutriEdu", page_icon="🧠", layout="wide")
+
+# Índices dos pontos faciais (corrigido com espaços)
+OLHO_ESQUERDO = {
+    "superior": [159, 145, 23, 27, 28, 56, 190],
+    "inferior": [23, 25, 110, 130, 133, 243, 244],
+    "canto_externo": [33, 133],
+    "canto_interno": [133, 243, 244, 145],
+}
+
+OLHO_DIREITO = {
+    "superior": [386, 374, 253, 257, 258, 286, 414],
+    "inferior": [253, 255, 339, 359, 362, 463, 464],
+    "canto_externo": [263, 362],
+    "canto_interno": [362, 463, 464, 374],
+}
 
 
-st.title('🧠 IA Emocional')
-
-
-# Initialize face mesh
-if MEDIAPIPE_DISPONIVEL:
-    mp_face_mesh = mp.solutions.face_mesh
-    mp_drawing = mp.solutions.drawing_utils
-    mp_drawing_styles = mp.solutions.drawing_styles
-    face_mesh = mp_face_mesh.FaceMesh(max_num_faces=1, refine_landmarks=True,
-    min_detection_confidence=0.5, min_tracking_confidence=0.5)
-else:
-    face_mesh = None
-
-
-EMOCOES_CORES = {'Feliz':(0,255,0),'Triste':(255,0,0),'Surpreso':(0,165,255),'Bravo':(0,0,255),'Neutro':(128,128,128)}
-EMOCOES_EMOJI = {'Feliz':'😄','Triste':'😢','Surpreso':'😲','Bravo':'😠','Neutro':'😐'}
-
-
-# função simples de detecção (proporções)
-def detectar_emocao_por_landmarks(landmarks):
-    if not landmarks or len(landmarks)<468:
-        return 'Neutro'
+def calcular_ear(pontos_olho, landmarks):
+    """Calcula Eye Aspect Ratio para detectar piscadas"""
     try:
-        # normaliza por distância horizontal entre olhos
-        dist = abs(landmarks[33].x - landmarks[263].x)
-        if dist==0: return 'Neutro'
-        abertura_olhos = (abs(landmarks[159].y-landmarks[145].y)+abs(landmarks[386].y-landmarks[374].y))/2/dist
-        abertura_boca = abs(landmarks[13].y-landmarks[14].y)/dist
-        largura_boca = abs(landmarks[61].x-landmarks[291].x)/dist
-        if abertura_olhos>0.30 and abertura_boca>0.32: return 'Surpreso'
-        if largura_boca>0.75 and abertura_boca<0.25: return 'Feliz'
-        if abertura_olhos<0.18: return 'Bravo'
-        if largura_boca<0.55 and abertura_boca<0.18: return 'Triste'
-    except Exception:
-        return 'Neutro'
-    return 'Neutro'
+        # Pontos verticais
+        p1 = np.array(
+            [
+                landmarks[pontos_olho["superior"][2]].x,
+                landmarks[pontos_olho["superior"][2]].y,
+            ]
+        )
+        p2 = np.array(
+            [
+                landmarks[pontos_olho["inferior"][2]].x,
+                landmarks[pontos_olho["inferior"][2]].y,
+            ]
+        )
 
+        # Pontos horizontais
+        p3 = np.array(
+            [
+                landmarks[pontos_olho["canto_externo"][0]].x,
+                landmarks[pontos_olho["canto_externo"][0]].y,
+            ]
+        )
+        p4 = np.array(
+            [
+                landmarks[pontos_olho["canto_interno"][0]].x,
+                landmarks[pontos_olho["canto_interno"][0]].y,
+            ]
+        )
 
-class EmotionVideoProcessor(VideoProcessorBase):
-    def __init__(self):
-        self.face_mesh = face_mesh
-        self.count = 0
+        # Distâncias
+        dist_vertical = np.linalg.norm(p1 - p2)
+        dist_horizontal = np.linalg.norm(p3 - p4)
 
-    def recv(self, frame: av.VideoFrame) -> av.VideoFrame:
-        img = frame.to_ndarray(format='bgr24')
-        self.count += 1
-        if self.count % 2 != 0:
-            return av.VideoFrame.from_ndarray(img, format='bgr24')
-        if not MEDIAPIPE_DISPONIVEL or self.face_mesh is None:
-            cv2.putText(img,'MediaPipe nao disponivel',(10,30),cv2.FONT_HERSHEY_SIMPLEX,0.7,(0,0,255),2)
-            return av.VideoFrame.from_ndarray(img, format='bgr24')
-        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        results = self.face_mesh.process(rgb)
-        if results.multi_face_landmarks:
-            lm = results.multi_face_landmarks[0]
-            emoc = detectar_emocao_por_landmarks(lm.landmark)
-            st.session_state['last_emotion'] = emoc
-            color = EMOCOES_CORES.get(emoc,(255,255,255))
-            emoji = EMOCOES_EMOJI.get(emoc,'😐')
-            cv2.rectangle(img,(5,5),(360,70),(0,0,0),-1)
-            cv2.putText(img,f"{emoji} {emoc}",(15,45),cv2.FONT_HERSHEY_SIMPLEX,1.1,color,3)
+        # EAR
+        if dist_horizontal > 0:
+            ear = dist_vertical / dist_horizontal
         else:
-            cv2.putText(img,'Nenhum rosto detectado',(10,30),cv2.FONT_HERSHEY_SIMPLEX,0.8,(0,0,255),2)
-        return av.VideoFrame.from_ndarray(img, format='bgr24')
+            ear = 0
+
+        return ear
+    except Exception as e:
+        st.error(f"Erro ao calcular EAR: {e}")
+        return 0
 
 
-if 'last_emotion' not in st.session_state:
-    st.session_state['last_emotion'] = 'Neutro'
+def detectar_estado_emocional(ear_medio, num_piscadas):
+    """Detecta o estado emocional baseado em EAR e piscadas"""
+    if ear_medio < 0.2:
+        return "😴 Cansado", "Você parece cansado. Que tal fazer uma pausa?"
+    elif num_piscadas > 20:
+        return "😵 Distraído", "Muitas piscadas! Tente focar mais."
+    elif 0.25 <= ear_medio <= 0.35:
+        return "😊 Focado", "Ótimo! Você está bem concentrado!"
+    else:
+        return "🤔 Normal", "Estado normal. Continue assim!"
 
 
-if not MEDIAPIPE_DISPONIVEL:
-    st.error('MediaPipe não instalado. pip install mediapipe==0.10.5 (Python 3.9 recomendado)')
-else:
-    webrtc_streamer(key='emo', mode=WebRtcMode.SENDRECV, video_processor_factory=EmotionVideoProcessor, media_stream_constraints={'video': True, 'audio': False}, async_processing=True)
+def main():
+    st.title("🧠 IA Emocional - Detector de Estado Cognitivo")
+    st.markdown(
+        """
+    Esta ferramenta usa **visão computacional** para detectar seu estado
+    emocional em tempo real através da sua webcam.
+    """
+    )
+
+    # Instruções
+    with st.expander("ℹ️ Como funciona?"):
+        st.write(
+            """
+        - A IA analisa seus olhos usando MediaPipe
+        - Detecta piscadas e abertura dos olhos
+        - Classifica seu estado: Focado, Cansado ou Distraído
+        - Dá feedback em tempo real
+        """
+        )
+
+    # Controles
+    col1, col2 = st.columns([3, 1])
+
+    with col2:
+        st.subheader("⚙️ Controles")
+        iniciar = st.button("▶️ Iniciar Análise", use_container_width=True)
+        parar = st.button("⏹️ Parar", use_container_width=True)
+
+        # Configurações
+        st.divider()
+        limiar_ear = st.slider(
+            "Limiar de piscada", 0.1, 0.4, 0.25, help="Menor valor = mais sensível"
+        )
+
+    with col1:
+        # Placeholder para vídeo e métricas
+        video_placeholder = st.empty()
+        metricas_placeholder = st.empty()
+        estado_placeholder = st.empty()
+
+        if iniciar and not parar:
+            # Inicializar câmera
+            cap = cv2.VideoCapture(0)
+
+            if not cap.isOpened():
+                st.error("❌ Não foi possível acessar a webcam!")
+                return
+
+            # Inicializar Face Mesh
+            with mp_face_mesh.FaceMesh(
+                max_num_faces=1,
+                refine_landmarks=True,
+                min_detection_confidence=0.5,
+                min_tracking_confidence=0.5,
+            ) as face_mesh:
+
+                contador_piscadas = 0
+                ear_historico = []
+                frame_count = 0
+
+                while cap.isOpened() and not parar:
+                    ret, frame = cap.read()
+                    if not ret:
+                        st.warning("⚠️ Erro ao capturar frame")
+                        break
+
+                    # Converter para RGB
+                    frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+
+                    # Processar com MediaPipe
+                    results = face_mesh.process(frame_rgb)
+
+                    if results.multi_face_landmarks:
+                        for face_landmarks in results.multi_face_landmarks:
+                            # Desenhar malha facial
+                            mp_drawing.draw_landmarks(
+                                image=frame_rgb,
+                                landmark_list=face_landmarks,
+                                connections=mp_face_mesh.FACEMESH_CONTOURS,
+                                landmark_drawing_spec=None,
+                                connection_drawing_spec=(
+                                    mp_drawing_styles.get_default_face_mesh_contours_style()
+                                ),
+                            )
+
+                            # Calcular EAR
+                            ear_esq = calcular_ear(
+                                OLHO_ESQUERDO, face_landmarks.landmark
+                            )
+                            ear_dir = calcular_ear(
+                                OLHO_DIREITO, face_landmarks.landmark
+                            )
+                            ear_medio = (ear_esq + ear_dir) / 2
+                            ear_historico.append(ear_medio)
+
+                            # Detectar piscada
+                            if ear_medio < limiar_ear:
+                                contador_piscadas += 1
+
+                    # Mostrar frame
+                    video_placeholder.image(
+                        frame_rgb, channels="RGB", use_container_width=True
+                    )
+
+                    # Atualizar métricas a cada 30 frames
+                    frame_count += 1
+                    if frame_count % 30 == 0 and ear_historico:
+                        ear_atual = np.mean(ear_historico[-30:])
+
+                        # Detectar estado
+                        estado, mensagem = detectar_estado_emocional(
+                            ear_atual, contador_piscadas
+                        )
+
+                        # Mostrar métricas
+                        metricas_placeholder.metric(
+                            "EAR Médio", f"{ear_atual:.3f}", help="Eye Aspect Ratio"
+                        )
+
+                        # Mostrar estado
+                        estado_placeholder.info(f"**{estado}**\n\n{mensagem}")
+
+                    time.sleep(0.03)  # ~30 FPS
+
+            cap.release()
+
+
+if __name__ == "__main__":
+    main()
