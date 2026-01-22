@@ -1,11 +1,17 @@
 import streamlit as st
-import cv2
 import numpy as np
 from PIL import Image
 import time
 
+try:
+    import cv2
+    CAM_AVAILABLE = True
+except ModuleNotFoundError:
+    cv2 = None
+    CAM_AVAILABLE = False
+
+
 # Imports do MediaPipe corrigidos
-# Agora assim:
 try:
     import mediapipe as mp
     mp_face_mesh = mp.solutions.face_mesh  # type: ignore
@@ -95,6 +101,14 @@ def detectar_estado_emocional(ear_medio, num_piscadas):
 
 def main():
     st.title("🧠 IA Emocional - Detector de Estado Cognitivo")
+    # 🚫 BLOQUEIO PARA STREAMLIT CLOUD
+    if not CAM_AVAILABLE:
+        st.warning(
+            "🚫 A funcionalidade de webcam não está disponível no Streamlit Cloud.\n\n"
+            "👉 Para usar a IA Emocional, execute o projeto localmente."
+        )
+        st.stop()
+        
     st.markdown(
         """
     Esta ferramenta usa **visão computacional** para detectar seu estado
