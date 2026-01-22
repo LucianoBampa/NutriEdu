@@ -1,6 +1,6 @@
 # 🥗 NutriEdu AI
 
-Plataforma educacional interativa baseada em Inteligência Artificial para **educação nutricional e socioemocional de crianças e adolescentes (3 a 18 anos)**.
+Plataforma educacional interativa baseada em Inteligência Artificial para **educação nutricional e socioemocional de crianças e adolescentes (7 a 18 anos)**.
 
 O NutriEdu AI combina **IA generativa**, **Streamlit** e **visão computacional** para apoiar alunos, professores e instituições no desenvolvimento de hábitos saudáveis, bem-estar emocional e aprendizagem significativa.
 
