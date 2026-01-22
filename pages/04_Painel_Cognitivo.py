@@ -42,12 +42,12 @@ def carregar_dados():
 
     try:
         query = """
-            SELECT 
-                nome, 
-                idade, 
-                disciplina, 
-                nota, 
-                estado_emocional, 
+            SELECT
+                nome,
+                idade,
+                disciplina,
+                nota,
+                estado_emocional,
                 data_avaliacao
             FROM desempenho_cognitivo
             ORDER BY data_avaliacao DESC
@@ -78,7 +78,7 @@ def inserir_dados_exemplo():
 
         conn.executemany(
             """
-            INSERT INTO desempenho_cognitivo 
+            INSERT INTO desempenho_cognitivo
             (aluno_id, nome, idade, disciplina, nota, estado_emocional)
             VALUES (?, ?, ?, ?, ?, ?)
         """,

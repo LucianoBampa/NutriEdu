@@ -46,7 +46,7 @@ cache_alimentos = {}
 
 def analisar_alimento(alimento, idade):
     """Analisa um alimento usando IA com tratamento de quota e cache."""
-    
+
     # Primeiro, checa se já analisou antes
     key = f"{alimento}_{idade}"
     if key in cache_alimentos:
@@ -89,7 +89,8 @@ Seja educativo, positivo e incentive hábitos saudáveis!
             messages=[
                 {
                     "role": "system",
-                    "content": "Você é um nutricionista educacional especializado em crianças e adolescentes.",
+                    "content": "Você é um nutricionista educacional "
+                    "especializado em crianças e adolescentes.",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -102,7 +103,9 @@ Seja educativo, positivo e incentive hábitos saudáveis!
         return resultado
 
     except RateLimitError:
-        st.warning("Quota da API da OpenAI esgotada. Tente novamente mais tarde.")
+        st.warning(
+            "Quota da API da OpenAI esgotada. Tente novamente mais tarde."
+            )
         return "Não foi possível analisar o alimento agora. 😔"
 
     except Exception as e:
@@ -121,7 +124,7 @@ def salvar_analise(alimento, idade, resultado):
 
         cursor.execute(
             """
-            INSERT INTO analises_nutricionais 
+            INSERT INTO analises_nutricionais
             (alimento, idade, resultado, data_analise)
             VALUES (?, ?, ?, datetime('now'))
         """,
@@ -244,9 +247,9 @@ def main():
 
                 cursor.execute(
                     """
-                    SELECT alimento, idade, data_analise 
-                    FROM analises_nutricionais 
-                    ORDER BY data_analise DESC 
+                    SELECT alimento, idade, data_analise
+                    FROM analises_nutricionais
+                    ORDER BY data_analise DESC
                     LIMIT 10
                 """
                 )
