@@ -162,10 +162,18 @@ if iniciar and not parar:
                     pisc_min,
                 )
 
+                st.session_state["estado_cognitivo"] = {
+                    "estado": estado,
+                    "ear": ear_medio,
+                    "piscadas_min": pisc_min,
+                    "timestamp": time.time(),
+                }
+
                 metric_box.metric(
                     "EAR Médio",
                     f"{ear_medio:.3f}",
                 )
+                
                 estado_box.info(
                     f"**{estado}**\n\n{msg}",
                 )
