@@ -123,7 +123,7 @@ streamlit run app.py
 
 ## 📚 Público-Alvo
 
-- Crianças e adolescentes (3 a 18 anos)
+- Crianças e adolescentes (7 a 18 anos)
 - Professores e educadores
 - Escolas e projetos educacionais
 
