@@ -1,5 +1,6 @@
 import streamlit as st
 from openai import OpenAI
+from openai.errors import RateLimitError
 import os
 
 # Import corrigido
@@ -39,21 +40,19 @@ def obter_cliente_openai():
     return OpenAI(api_key=api_key)
 
 
-import streamlit as st
-import openai
-
 # Exemplo de cache simples para não gastar créditos desnecessariamente
 cache_alimentos = {}
 
 
 def analisar_alimento(alimento, idade):
-    """Analisa um alimento usando IA com tratamento de quota."""
+    """Analisa um alimento usando IA com tratamento de quota e cache."""
+    
     # Primeiro, checa se já analisou antes
     key = f"{alimento}_{idade}"
     if key in cache_alimentos:
         return cache_alimentos[key]
 
-    client = obter_cliente_openai()
+    client = obter_cliente_openai()  # sua função que retorna o client OpenAI
 
     # Adaptar prompt de acordo com a idade
     if idade < 6:
@@ -70,19 +69,19 @@ def analisar_alimento(alimento, idade):
         linguagem = "detalhada e científica"
 
     prompt = f"""
-    Você é um nutricionista educacional para crianças e adolescentes.
-    
-    Analise o seguinte alimento: {alimento}
-    Idade do aluno: {idade} anos ({nivel})
-    
-    Forneça:
-    1. Classificação: Saudável ✅ / Moderado ⚠️ / Não recomendado ❌
-    2. Explicação em linguagem {linguagem}
-    3. Principais nutrientes (se aplicável)
-    4. Sugestão de melhoria ou alternativa mais saudável
-    
-    Seja educativo, positivo e incentive hábitos saudáveis!
-    """
+Você é um nutricionista educacional para crianças e adolescentes.
+
+Analise o seguinte alimento: {alimento}
+Idade do aluno: {idade} anos ({nivel})
+
+Forneça:
+1. Classificação: Saudável ✅ / Moderado ⚠️ / Não recomendado ❌
+2. Explicação em linguagem {linguagem}
+3. Principais nutrientes (se aplicável)
+4. Sugestão de melhoria ou alternativa mais saudável
+
+Seja educativo, positivo e incentive hábitos saudáveis!
+"""
 
     try:
         response = client.chat.completions.create(
@@ -90,8 +89,7 @@ def analisar_alimento(alimento, idade):
             messages=[
                 {
                     "role": "system",
-                    "content": "Você é um nutricionista educacional "
-                               "especializado em crianças e adolescentes.",
+                    "content": "Você é um nutricionista educacional especializado em crianças e adolescentes.",
                 },
                 {"role": "user", "content": prompt},
             ],
@@ -103,9 +101,10 @@ def analisar_alimento(alimento, idade):
         cache_alimentos[key] = resultado  # salva no cache
         return resultado
 
-    except openai.error.RateLimitError:
+    except RateLimitError:
         st.warning("Quota da API da OpenAI esgotada. Tente novamente mais tarde.")
         return "Não foi possível analisar o alimento agora. 😔"
+
     except Exception as e:
         st.error(f"Erro inesperado ao analisar alimento: {e}")
         return None
