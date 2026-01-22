@@ -1,158 +1,126 @@
-import os
 import streamlit as st
-import numpy as np
-import time
+import sys
 
-# =====================================================
-# CONFIGURAÇÃO DA PÁGINA
-# =====================================================
 st.set_page_config(
-    page_title="IA Emocional - NutriEdu",
+    page_title="IA Emocional",
     page_icon="🧠",
-    layout="wide"
+    layout="centered"
 )
 
 st.title("🧠 IA Emocional - Detector de Estado Cognitivo")
 
 # =====================================================
-# DETECÇÃO DE AMBIENTE
+# FUNÇÃO: verifica se está rodando local ou cloud
 # =====================================================
-IS_CLOUD = os.getenv("STREAMLIT_SERVER_RUNNING") == "1"
+def rodando_no_cloud():
+    return not sys.platform.startswith("win") and not sys.platform.startswith("darwin")
 
-if IS_CLOUD:
-    st.warning(
-        "🚫 **Funcionalidade indisponível no Streamlit Cloud**\n\n"
-        "Esta IA utiliza webcam e MediaPipe, que exigem execução local.\n\n"
-        "👉 Clone o projeto e execute localmente para utilizar esta função."
+# =====================================================
+# TENTATIVA DE IMPORTAÇÃO (somente local)
+# =====================================================
+if rodando_no_cloud():
+    st.warning("⚠️ Este recurso não é suportado no Streamlit Cloud.")
+    st.info(
+        """
+        🔒 **Limitações do ambiente Cloud**
+        - Webcam não disponível
+        - MediaPipe não suportado
+        
+        👉 Execute este módulo **localmente** para usar o detector emocional.
+        """
     )
+
+    st.markdown("### 💻 Como executar localmente:")
+    st.code(
+        "pip install opencv-python mediapipe streamlit\n"
+        "streamlit run app.py",
+        language="bash"
+    )
+
     st.stop()
 
 # =====================================================
-# IMPORTS LOCAIS (SÓ EXECUTA LOCAL)
+# IMPORTAÇÕES LOCAIS (SÓ EXECUTAM NO PC)
 # =====================================================
-import cv2
-import mediapipe as mp
+try:
+    import cv2
+    import mediapipe as mp
+    import numpy as np
+except Exception as e:
+    st.error("Erro ao carregar bibliotecas locais.")
+    st.exception(e)
+    st.stop()
 
+# =====================================================
+# MEDIA PIPE
+# =====================================================
 mp_face_mesh = mp.solutions.face_mesh
-mp_drawing = mp.solutions.drawing_utils
-mp_drawing_styles = mp.solutions.drawing_styles
+face_mesh = mp_face_mesh.FaceMesh(
+    max_num_faces=1,
+    refine_landmarks=True,
+    min_detection_confidence=0.5,
+    min_tracking_confidence=0.5,
+)
 
 # =====================================================
-# CONSTANTES
+# FUNÇÃO: Classificação simples de estado cognitivo
 # =====================================================
-OLHO_ESQUERDO = {
-    "superior": [159, 145, 23, 27, 28, 56, 190],
-    "inferior": [23, 25, 110, 130, 133, 243, 244],
-    "canto_externo": [33, 133],
-    "canto_interno": [133, 243, 244, 145],
-}
-
-OLHO_DIREITO = {
-    "superior": [386, 374, 253, 257, 258, 286, 414],
-    "inferior": [253, 255, 339, 359, 362, 463, 464],
-    "canto_externo": [263, 362],
-    "canto_interno": [362, 463, 464, 374],
-}
+def classificar_estado(piscar, abertura_olhos):
+    if piscar > 20:
+        return "😴 Fadiga"
+    elif abertura_olhos < 0.015:
+        return "😐 Baixa Atenção"
+    else:
+        return "🙂 Normal"
 
 # =====================================================
-# FUNÇÕES
+# INTERFACE
 # =====================================================
-def calcular_ear(pontos, landmarks):
-    try:
-        p1 = np.array([landmarks[pontos["superior"][2]].x,
-                       landmarks[pontos["superior"][2]].y])
-        p2 = np.array([landmarks[pontos["inferior"][2]].x,
-                       landmarks[pontos["inferior"][2]].y])
-        p3 = np.array([landmarks[pontos["canto_externo"][0]].x,
-                       landmarks[pontos["canto_externo"][0]].y])
-        p4 = np.array([landmarks[pontos["canto_interno"][0]].x,
-                       landmarks[pontos["canto_interno"][0]].y])
+st.success("✅ Ambiente local detectado. Webcam habilitada.")
 
-        return np.linalg.norm(p1 - p2) / np.linalg.norm(p3 - p4)
-    except Exception:
-        return 0
+iniciar = st.button("📷 Iniciar Detecção")
 
+if iniciar:
+    cap = cv2.VideoCapture(0)
 
-def detectar_estado(ear, piscadas):
-    if ear < 0.20:
-        return "😴 Cansado", "Você parece cansado. Faça uma pausa."
-    elif piscadas > 20:
-        return "😵 Distraído", "Muitas piscadas detectadas."
-    elif 0.25 <= ear <= 0.35:
-        return "😊 Focado", "Você está bem concentrado!"
-    return "🤔 Normal", "Estado cognitivo normal."
+    stframe = st.empty()
+    status = st.empty()
 
-# =====================================================
-# MAIN
-# =====================================================
-def main():
-    st.markdown(
-        "Esta ferramenta utiliza **Visão Computacional** para detectar "
-        "o estado emocional em tempo real."
-    )
+    piscadas = 0
 
-    col1, col2 = st.columns([3, 1])
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-    with col2:
-        iniciar = st.button("▶️ Iniciar")
-        parar = st.button("⏹️ Parar")
-        limiar = st.slider("Sensibilidade", 0.1, 0.4, 0.25)
+        rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        resultado = face_mesh.process(rgb)
 
-    with col1:
-        video = st.empty()
-        estado_box = st.empty()
+        abertura_olhos = 0.02  # valor padrão
 
-        if iniciar and not parar:
-            cap = cv2.VideoCapture(0)
+        if resultado.multi_face_landmarks:
+            landmarks = resultado.multi_face_landmarks[0].landmark
 
-            with mp_face_mesh.FaceMesh(
-                max_num_faces=1,
-                refine_landmarks=True,
-                min_detection_confidence=0.5,
-                min_tracking_confidence=0.5,
-            ) as face_mesh:
+            olho_sup = landmarks[159].y
+            olho_inf = landmarks[145].y
+            abertura_olhos = abs(olho_sup - olho_inf)
 
-                piscadas = 0
-                historico = []
+            if abertura_olhos < 0.01:
+                piscadas += 1
 
-                while cap.isOpened() and not parar:
-                    ret, frame = cap.read()
-                    if not ret:
-                        break
+        estado = classificar_estado(piscadas, abertura_olhos)
 
-                    rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                    results = face_mesh.process(rgb)
+        cv2.putText(
+            frame,
+            f"Estado: {estado}",
+            (30, 40),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 255, 0),
+            2,
+        )
 
-                    if results.multi_face_landmarks:
-                        for face in results.multi_face_landmarks:
-                            mp_drawing.draw_landmarks(
-                                rgb,
-                                face,
-                                mp_face_mesh.FACEMESH_CONTOURS,
-                                None,
-                                mp_drawing_styles.get_default_face_mesh_contours_style()
-                            )
+        stframe.image(frame, channels="BGR")
+        status.markdown(f"### Estado Cognitivo: **{estado}**")
 
-                            ear = (
-                                calcular_ear(OLHO_ESQUERDO, face.landmark)
-                                + calcular_ear(OLHO_DIREITO, face.landmark)
-                            ) / 2
-
-                            historico.append(ear)
-                            if ear < limiar:
-                                piscadas += 1
-
-                    video.image(rgb, channels="RGB", use_container_width=True)
-
-                    if len(historico) > 30:
-                        ear_m = np.mean(historico[-30:])
-                        estado, msg = detectar_estado(ear_m, piscadas)
-                        estado_box.info(f"**{estado}**\n\n{msg}")
-
-                    time.sleep(0.03)
-
-            cap.release()
-
-
-if __name__ == "__main__":
-    main()
+    cap.release()
