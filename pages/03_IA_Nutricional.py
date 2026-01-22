@@ -1,6 +1,6 @@
 import streamlit as st
 from openai import OpenAI
-from openai.errors import RateLimitError
+from openai import RateLimitError
 import os
 
 # Import corrigido
